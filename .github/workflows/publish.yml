@@ -1,0 +1,44 @@
+name: Publish container image
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch: # for manual trigger
+
+jobs:
+  build-and-publish:
+    permissions:
+      contents: read
+      packages: write
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Get the code
+      uses: actions/checkout@v6
+
+    - name: Get .NET
+      uses: actions/setup-dotnet@v5
+
+    - name: Dry-run build
+      if: github.ref_type != 'tag'
+      working-directory: src/OAuch
+      run: |
+        dotnet publish --arch x64 \
+            -p:ContainerRepository=${{ github.repository }} \
+            -p:ContainerRegistry=ghcr.io
+
+    - name: Build and publish
+      if: github.ref_type == 'tag'
+      working-directory: src/OAuch
+      run: |
+        dotnet publish -t:PublishContainer \
+          -p:ContainerRepository=${{ github.repository }} \
+          -p:ContainerRegistry=ghcr.io \
+          -p:ContainerRegistryUsername=${{ github.actor }} \
+          -p:ContainerRegistryPassword=${{ secrets.GITHUB_TOKEN }} \
+          -p:ContainerImageTags='"latest;${{ github.ref_name }}"' \
+          -p:ContainerRuntimeIdentifier=linux-x64 \
+          -p:ContainerRuntimeIdentifier=linux-arm64
